@@ -12,6 +12,8 @@ metadata:
     devops-lab/mascot-original: "кабачок"
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: rabbitmq
@@ -47,16 +49,24 @@ spec:
             limits:
               cpu: 500m
               memory: 512Mi
+          startupProbe:
+            exec:
+              command: ["rabbitmq-diagnostics", "-q", "ping"]
+            periodSeconds: 10
+            timeoutSeconds: 10
+            failureThreshold: 30
           readinessProbe:
             exec:
               command: ["rabbitmq-diagnostics", "-q", "ping"]
-            initialDelaySeconds: 20
             periodSeconds: 10
+            timeoutSeconds: 10
+            failureThreshold: 6
           livenessProbe:
             exec:
               command: ["rabbitmq-diagnostics", "-q", "ping"]
-            initialDelaySeconds: 40
             periodSeconds: 20
+            timeoutSeconds: 10
+            failureThreshold: 3
           volumeMounts:
             - name: rabbitmq-data
               mountPath: /var/lib/rabbitmq

@@ -8,6 +8,7 @@ $namespace = 'hotel-reservation-system'
 $reportDirectory = Join-Path $repositoryRoot 'reports'
 $reportPath = Join-Path $reportDirectory 'lab3-demo.txt'
 $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
+$portForwardJob = $null
 
 New-Item -ItemType Directory -Path $reportDirectory -Force | Out-Null
 [System.IO.File]::WriteAllText($reportPath, "# DVO-L3-7F2A91`n", $utf8NoBom)
@@ -69,18 +70,39 @@ try {
             throw 'Could not find a ready API Gateway pod.'
         }
         Invoke-Kubectl -Arguments @(
-            'exec', 'deployment/hotel-aggregator', '--', 'printenv', 'GrpcServices__CatalogService'
+            'exec', 'deployment/hotel-aggregator', "--namespace=$namespace", '--',
+            'printenv', 'GrpcServices__CatalogService'
         )
         Invoke-Kubectl -Arguments @(
-            'exec', 'deployment/hotel-catalog-api', '--', 'sh', '-c',
+            'exec', 'deployment/hotel-catalog-api', "--namespace=$namespace", '--', 'sh', '-c',
             'test -n "$POSTGRES_PASSWORD" && echo POSTGRES_PASSWORD=present'
         )
         Invoke-Kubectl -Arguments @(
-            'exec', 'deployment/hotel-reviews-api', '--', 'sh', '-c',
+            'exec', 'deployment/hotel-reviews-api', "--namespace=$namespace", '--', 'sh', '-c',
             'test -n "$MONGO_ROOT_PASSWORD" && echo MONGO_ROOT_PASSWORD=present'
         )
 
-        $gatewayUrl = "http://$(minikube ip):30080/"
+        $portForwardJob = Start-Job -ArgumentList $namespace -ScriptBlock {
+            param($targetNamespace)
+            kubectl port-forward service/hotel-api-gateway 18080:80 "--namespace=$targetNamespace"
+        }
+        $gatewayUrl = 'http://127.0.0.1:18080/'
+        $portForwardReady = $false
+        for ($attempt = 0; $attempt -lt 30; $attempt++) {
+            if ($portForwardJob.State -ne 'Running') {
+                $portForwardOutput = Receive-Job -Job $portForwardJob
+                throw "kubectl port-forward stopped before becoming ready: $portForwardOutput"
+            }
+            if (Test-NetConnection -ComputerName 127.0.0.1 -Port 18080 -InformationLevel Quiet -WarningAction SilentlyContinue) {
+                $portForwardReady = $true
+                break
+            }
+            Start-Sleep -Seconds 1
+        }
+        if (-not $portForwardReady) {
+            throw 'kubectl port-forward did not become ready on 127.0.0.1:18080.'
+        }
+
         $gatewayPod = (& kubectl get pods --namespace=$namespace -l app=hotel-api-gateway `
                 -o 'jsonpath={.items[0].metadata.name}').Trim()
         Invoke-Kubectl -Arguments @('delete', 'pod', $gatewayPod, "--namespace=$namespace", '--wait=true')
@@ -190,6 +212,12 @@ try {
     }
 }
 finally {
+    if ($null -ne $portForwardJob) {
+        if ($portForwardJob.State -eq 'Running') {
+            Stop-Job -Job $portForwardJob
+        }
+        Remove-Job -Job $portForwardJob -Force
+    }
     $env:IMAGE_TAG = $originalImageTag
     Stop-Transcript | Out-Null
     $transcript = [System.IO.File]::ReadAllText($reportPath)

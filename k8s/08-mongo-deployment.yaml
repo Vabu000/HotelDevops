@@ -12,6 +12,8 @@ metadata:
     devops-lab/mascot-original: "кабачок"
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: mongo
@@ -45,16 +47,24 @@ spec:
             limits:
               cpu: "1"
               memory: 768Mi
+          startupProbe:
+            exec:
+              command: ["sh", "-c", "mongosh --quiet --eval 'db.adminCommand({ ping: 1 }).ok'"]
+            periodSeconds: 10
+            timeoutSeconds: 10
+            failureThreshold: 30
           readinessProbe:
             exec:
               command: ["sh", "-c", "mongosh --quiet --eval 'db.adminCommand({ ping: 1 }).ok'"]
-            initialDelaySeconds: 10
-            periodSeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 10
+            failureThreshold: 6
           livenessProbe:
             exec:
               command: ["sh", "-c", "mongosh --quiet --eval 'db.adminCommand({ ping: 1 }).ok'"]
-            initialDelaySeconds: 30
-            periodSeconds: 10
+            periodSeconds: 20
+            timeoutSeconds: 10
+            failureThreshold: 3
           volumeMounts:
             - name: mongo-data
               mountPath: /data/db

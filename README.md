@@ -77,8 +77,9 @@ kubectl wait --for=condition=available deployment --all -n hotel-reservation-sys
 kubectl get pods,deployments,replicasets,services -n hotel-reservation-system -o wide
 ```
 
-У `k8s/` окремий YAML-файл на кожен Kubernetes object. Namespace ідеться першим за
-нумерацією, тому весь каталог застосовується однією командою. Deployment-и сервісів
+У `k8s/` Kubernetes-ресурси описані у YAML-файлах; Reservation Deployment і Service
+об’єднані в одному файлі й розділені `---`. Namespace ідеться першим за нумерацією,
+тому весь каталог застосовується однією командою. Deployment-и сервісів
 мають по дві репліки, узгоджені selectors, CPU/memory requests і limits, а також
 startup/readiness/liveness probes. Для PostgreSQL, MongoDB і RabbitMQ визначені PVC.
 Gateway відкритий через NodePort `30080`:
@@ -88,6 +89,11 @@ $url = "http://$(minikube ip):30080/"
 Invoke-RestMethod $url
 minikube service hotel-api-gateway -n hotel-reservation-system --url
 ```
+
+Якщо NodePort недоступний у Windows із Docker-драйвером Minikube, відкрийте
+тимчасовий тунель `kubectl port-forward service/hotel-api-gateway 18080:80
+-n hotel-reservation-system` в одному терміналі та перевірте
+`http://127.0.0.1:18080/` в іншому.
 
 ConfigMap `hotel-app-config` містить середовище застосунку, адреси gRPC-сервісів,
 Redis, назву MongoDB та маршрути Gateway. HTTP API слухають порт `8080`, а сервіси
