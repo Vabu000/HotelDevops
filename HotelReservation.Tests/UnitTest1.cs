@@ -17,7 +17,7 @@ public class ReservationTests
     [InlineData(ReservationStatus.Pending, 0)]
     [InlineData(ReservationStatus.Confirmed, 1)]
     [InlineData(ReservationStatus.CheckedIn, 2)]
-    [InlineData(ReservationStatus.CheckedOut, 3)]
+    [InlineData(ReservationStatus.CheckedOut, 99S)]
     [InlineData(ReservationStatus.Cancelled, 4)]
     public void ReservationStatus_UsesStableDatabaseValues(ReservationStatus status, int expectedValue)
     {
